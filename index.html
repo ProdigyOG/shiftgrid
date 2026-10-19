@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shiftgrid</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#07020f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Michroma&display=swap">
+<link rel="stylesheet" href="css/dash.css">
+</head>
+<body>
+<div id="app" data-skin="outrun">
+
+  <!-- 1. Startup animation -->
+  <section id="screen-boot" class="screen">
+    <canvas id="boot-canvas" aria-label="Startup animation, tap to skip"></canvas>
+  </section>
+
+  <!-- 2. Garage: everything you set up while parked -->
+  <section id="screen-home" class="screen" hidden>
+    <div class="home">
+      <header class="home-head">
+        <h1 class="wordmark">SHIFTGRID</h1>
+        <div class="rank" id="home-rank"></div>
+      </header>
+
+      <div class="daily" id="home-daily"></div>
+
+      <div class="field">
+        <span class="field-label">Mode</span>
+        <div class="choice" role="radiogroup" aria-label="Mode">
+          <button data-set="mode" data-value="chill">Chill</button>
+          <button data-set="mode" data-value="game">Game</button>
+          <button data-set="mode" data-value="track">Track Day</button>
+        </div>
+        <p class="note" id="mode-note"></p>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Look</span>
+        <div class="choice" role="radiogroup" aria-label="Look">
+          <button data-set="skin" data-value="outrun">Outrun Grid</button>
+          <button data-set="skin" data-value="lemans">Le Mans Night</button>
+          <button data-set="skin" data-value="stealth">Stealth</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Data</span>
+        <div class="choice two" role="radiogroup" aria-label="Data">
+          <button data-set="source" data-value="sim">Simulator</button>
+          <button data-set="source" data-value="car">Car (Bluetooth)</button>
+        </div>
+        <p class="note" id="car-note"></p>
+      </div>
+
+      <div class="toggles">
+        <button class="toggle" data-toggle="paddle">Paddle shifting</button>
+        <button class="toggle" data-toggle="sound">Sounds</button>
+        <button class="toggle" data-toggle="voice">Voice</button>
+        <button class="toggle" data-toggle="units"><span id="units-label">mph</span></button>
+      </div>
+
+      <button class="start" data-action="start">Start drive</button>
+
+      <nav class="home-links">
+        <button data-action="stats">Weekly stats</button>
+        <button data-action="badges">Badges</button>
+        <button data-action="myvoice">My voice</button>
+        <button data-action="reset">Reset progress</button>
+      </nav>
+      <p class="note"><a href="obd-test.html">Adapter connection test</a></p>
+    </div>
+  </section>
+
+  <!-- 3. The dashboard while driving -->
+  <section id="screen-drive" class="screen" hidden>
+    <canvas id="bg-canvas" class="bg"></canvas>
+    <div class="dash" id="dash">
+      <div class="shiftbar" id="shiftbar"><span class="ideal" id="ideal-mark"></span></div>
+
+      <div class="topline">
+        <span class="chips">
+          <span class="chip" id="mode-chip">GAME</span>
+          <button class="sim-chip" id="sim-chip" data-action="sim-speed">SIM ×1</button>
+        </span>
+        <span class="combo" id="combo"></span>
+        <span class="score" id="score"></span>
+      </div>
+
+      <div class="cluster">
+        <div class="speed"><span id="speed">0</span><small id="speed-unit">MPH</small></div>
+        <div class="gear" id="gear">–</div>
+        <div class="gmeter"><canvas id="gdot"></canvas></div>
+      </div>
+
+      <div class="bottomline">
+        <div class="readout" id="readout-a"></div>
+        <div class="readout big" id="readout-b"></div>
+        <div class="readout" id="readout-c"></div>
+      </div>
+
+      <div class="banner" id="banner" aria-live="polite" hidden>
+        <div class="banner-main" id="banner-main"></div>
+        <div class="banner-sub" id="banner-sub"></div>
+      </div>
+
+      <div class="parked" id="parked" hidden>
+        <button data-action="finish">Finish drive</button>
+        <button data-action="cycle-mode">Switch mode</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Report card / weekly stats / badges (filled in by screens.js) -->
+  <section id="screen-panel" class="screen" hidden>
+    <div class="panel" id="panel"></div>
+  </section>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

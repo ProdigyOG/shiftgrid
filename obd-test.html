@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shiftgrid Connection Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Michroma&display=swap">
+<link rel="stylesheet" href="css/dash.css">
+<style>
+  /* Connection test: big live numbers, then the adapter's log underneath. */
+  body { overflow: auto; }
+  .test { max-width: 760px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display: grid; gap: 16px; }
+  .live { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .live .stat b { font-size: 40px; }
+  .log { font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; background: var(--glass); border: 1px solid var(--line); border-radius: 6px; padding: 12px; max-height: 50vh; overflow: auto; user-select: text; -webkit-user-select: text; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .row .start { flex: 1; min-width: 200px; min-height: 60px; font-size: 16px; }
+</style>
+</head>
+<body>
+<div id="app" data-skin="outrun">
+  <div class="test">
+    <h1 class="wordmark">CONNECTION TEST</h1>
+    <p class="note">Car parked, ignition on. Don't pair the adapter in iPhone Settings, just tap Connect.</p>
+    <div class="row">
+      <button class="start" id="connect">Connect adapter</button>
+      <button class="start" id="motion">Test motion sensor</button>
+    </div>
+    <p class="note warn" id="status" role="status"></p>
+    <div class="live stats" id="live"></div>
+    <h3 class="field-label">Adapter log (screenshot this for Claude if anything fails)</h3>
+    <div class="log" id="log"></div>
+    <a class="note" href="./">Back to the dashboard</a>
+  </div>
+</div>
+<script type="module" src="js/obdtest.js"></script>
+</body>
+</html>
