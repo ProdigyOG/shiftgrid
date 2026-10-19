@@ -60,6 +60,11 @@ export const sfx = {
   warm() {
     [392, 523.25, 659.25].forEach((f, i) => tone(f, { at: i * 0.12, dur: 0.25, vol: 0.18 }));
   },
+  // shift assist: two quick high beeps, easy to hear over the engine
+  shiftCue() {
+    tone(1568, { dur: 0.07, type: 'square', vol: 0.12 });
+    tone(2093, { at: 0.09, dur: 0.09, type: 'square', vol: 0.12 });
+  },
   soft() {
     tone(180, { dur: 0.25, vol: 0.12 });
   },

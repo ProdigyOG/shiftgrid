@@ -1,7 +1,7 @@
 // Draws the live dashboard: shift-light bar, speed, gear, g-meter,
 // bottom readouts, background and the big grade banner.
 
-import { CAR, BANNER_MS, GRADING } from '../config.js';
+import { CAR, BANNER_MS } from '../config.js';
 
 const SEGMENTS = 15;
 const RPM_FLOOR = 1000;
@@ -82,18 +82,16 @@ export class Hud {
     this.set('unit', this.el.unit, s.units === 'mph' ? 'MPH' : 'KM/H');
     this.set('gear', this.el.gear, f.gear ?? '–');
 
-    // shift-light bar + ideal shift marker (Game / Track with paddles)
+    // shift-light bar, plus shift assist: gold marker at the ideal point, flash when it's time
     const lit = Math.round(rpmK * SEGMENTS);
     this.segs.forEach((seg, i) => seg.classList.toggle('on', i < lit));
-    const showIdeal = s.mode !== 'chill' && s.grading && !f.stopped;
+    const showIdeal = s.mode !== 'chill' && s.assistIdeal !== null;
     this.el.ideal.hidden = !showIdeal;
     if (showIdeal) {
-      this.el.ideal.style.left = `${clamp01((s.ideal - RPM_FLOOR) / (CAR.redlineRpm - RPM_FLOOR)) * 100}%`;
-      const inWindow = Math.abs(f.rpm - s.ideal) <= GRADING.upshift.perfectWindow && f.throttle > 12;
-      this.bar.classList.toggle('flash', inWindow);
-    } else {
-      this.bar.classList.remove('flash');
+      this.el.ideal.style.left = `${clamp01((s.assistIdeal - RPM_FLOOR) / (CAR.redlineRpm - RPM_FLOOR)) * 100}%`;
     }
+    this.bar.classList.toggle('flash', s.assistFlash);
+    this.dash.classList.toggle('shift-now', s.assistFlash);
 
     this.set('combo', this.el.combo, s.combo >= 2 ? `x${s.multiplier} · ${s.combo} COMBO` : '');
     this.set('score', this.el.score, s.grading ? s.score.toLocaleString() : '');

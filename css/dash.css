@@ -228,7 +228,7 @@ button:focus-visible {
 }
 .toggles {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 8px;
 }
 .toggle[aria-pressed='false'] {
@@ -524,6 +524,10 @@ button:focus-visible {
 .dash[data-mode='chill'] .score,
 .dash[data-mode='chill'] .gmeter {
   visibility: hidden;
+}
+.dash.shift-now .gear {
+  color: var(--hot);
+  text-shadow: 0 0 40px var(--hot), 0 0 90px var(--hot);
 }
 .dash[data-mode='chill'] .gear {
   color: var(--text);

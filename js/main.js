@@ -8,7 +8,8 @@ import { Simulator } from './data/simulator.js';
 import { ObdSource } from './data/obd.js';
 import { Motion } from './data/motion.js';
 import { Telemetry } from './core/telemetry.js';
-import { ShiftGrader, idealShiftRpm } from './core/shifts.js';
+import { ShiftGrader } from './core/shifts.js';
+import { ShiftAssist } from './core/shiftassist.js';
 import { LaunchTimer } from './core/launch.js';
 import { DriveSession } from './core/drive.js';
 import * as progress from './core/progress.js';
@@ -23,6 +24,8 @@ import { openMyVoice } from './ui/myvoice.js';
 const tel = new Telemetry();
 const grader = new ShiftGrader(tel);
 const launch = new LaunchTimer();
+const assist = new ShiftAssist(tel);
+let assistState = { ideal: null, flashing: false };
 const hud = new Hud();
 
 let source = null;
@@ -142,6 +145,7 @@ async function startDrive() {
   tel.reset();
   grader.reset();
   launch.reset();
+  assist.reset();
   liveBadges = [];
   stoppedSince = null;
   latest = null;
@@ -190,6 +194,8 @@ function onSample(sample) {
   }
 
   throttleSmooth += (f.throttle - throttleSmooth) * 0.1;
+  // shift assist only makes sense when you're the one shifting (paddles)
+  assistState = assist.update(f, { enabled: settings.shiftAssist && settings.paddle, throttle: throttleSmooth });
   stoppedSince = f.stopped ? (stoppedSince ?? f.t) : null;
   latest = { f, locked };
 }
@@ -236,6 +242,8 @@ on('shift', (e) => {
   if (combo) voice.announce([combo]);
   else if (e.grade !== 'OK') voice.announce([e.grade.toLowerCase()]);
 });
+
+on('shiftCue', () => session && sfx.shiftCue());
 
 on('launch', (e) => {
   if (!session) return;
@@ -318,7 +326,8 @@ function frame() {
       mode: session.mode,
       units: settings.units,
       grading: settings.paddle && !locked && session.mode !== 'chill',
-      ideal: idealShiftRpm(throttleSmooth),
+      assistIdeal: assistState.ideal,
+      assistFlash: assistState.flashing,
       combo: grader.combo,
       multiplier: grader.multiplier,
       score: grader.score,

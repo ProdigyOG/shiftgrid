@@ -1,6 +1,6 @@
 // The announcer. Plays recorded clips (the arcade voice, or your own recordings)
-// through an arcade-style effect: a little pitch lift, some crunch, and a
-// short echo. Lines can be chained, e.g. "Zero to sixty!" + "four" + "point" + "five" + "seconds".
+// through an arcade-style effect: a little pitch lift and a touch of crunch.
+// Lines can be chained, e.g. "Zero to sixty!" + "four" + "point" + "five" + "seconds".
 // If a clip is missing, it falls back to the phone's built-in voice.
 
 import { settings } from '../core/progress.js';
@@ -81,7 +81,7 @@ function bufferFor(key) {
   return arcade.has(key) ? { buf: arcade.get(key), mine: false } : null;
 }
 
-// The arcade sound: crunch + echo. Built once per phrase.
+// The arcade sound: brighter, with a touch of crunch. Built once per phrase.
 function arcadeChain(ctx, fx) {
   const input = ctx.createGain();
   const out = ctx.createDynamicsCompressor();
@@ -108,24 +108,14 @@ function arcadeChain(ctx, fx) {
   }
   crush.curve = curve;
   const dry = ctx.createGain();
-  dry.gain.value = 0.75;
+  dry.gain.value = 0.9;
   const wet = ctx.createGain();
-  wet.gain.value = 0.3;
+  wet.gain.value = 0.15; // just a hint of crunch
 
-  // short echo
-  const delay = ctx.createDelay(1);
-  delay.delayTime.value = 0.11;
-  const feedback = ctx.createGain();
-  feedback.gain.value = 0.25;
-  const echo = ctx.createGain();
-  echo.gain.value = 0.28;
-
+  // (no echo: it sounded muddy through a phone speaker in the car)
   input.connect(hp).connect(presence);
   presence.connect(dry).connect(out);
   presence.connect(crush).connect(wet).connect(out);
-  presence.connect(delay);
-  delay.connect(feedback).connect(delay);
-  delay.connect(echo).connect(out);
   return input;
 }
 

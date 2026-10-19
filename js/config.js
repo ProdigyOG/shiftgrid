@@ -67,4 +67,13 @@ export const TRACK = {
   traceStepM: 50,
 };
 
+export const SHIFT_ASSIST = {
+  leadS: 0.35, // cue this far ahead of the ideal point (data delay + your reaction time)
+  coldMaxRpm: 3500, // while the engine is cold, cue no higher than this
+  minThrottle: 12, // no cue when coasting
+  maxLeadRpm: 900, // never cue more than this many rpm early
+  rearmBelow: 600, // if revs drop this far after a cue without a shift, cue again next time
+  flashMs: 800,
+};
+
 export const BANNER_MS = 1500;

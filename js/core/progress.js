@@ -57,6 +57,7 @@ const SETTINGS_DEFAULTS = {
   skin: 'outrun',
   units: 'mph',
   paddle: true,
+  shiftAssist: true,
   sound: true,
   voice: true,
   voicePack: 'arcade', // 'arcade' or 'mine'
