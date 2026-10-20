@@ -58,7 +58,8 @@ export function renderHome() {
 const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const stat = (value, label) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
 
-export function renderReport(result) {
+// hasRecording: show the "Save drive data" button
+export function renderReport(result, { hasRecording = false } = {}) {
   const r = result.record;
   const dist = settings.units === 'mph' ? `${(r.distKm / 1.609).toFixed(1)} mi` : `${r.distKm} km`;
   const highlights = [];
@@ -98,7 +99,16 @@ export function renderReport(result) {
       ${stat(`${r.peakBrakeG.toFixed(2)}g`, 'Hardest brake')}
       ${shiftStats}${speedStats}
     </div>
-    <div class="panel-actions"><button class="primary" data-action="home">Back to garage</button></div>`;
+    ${
+      hasRecording
+        ? `<p class="note">Save this drive's data and send it to Claude to tune the app to your car.</p>
+    <p class="note warn" id="save-status" role="status"></p>`
+        : ''
+    }
+    <div class="panel-actions">
+      ${hasRecording ? '<button data-action="save-data">Save drive data</button>' : ''}
+      <button class="primary" data-action="home">Back to garage</button>
+    </div>`;
   showScreen('panel');
 }
 

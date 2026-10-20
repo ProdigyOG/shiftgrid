@@ -1,6 +1,6 @@
 // Connection test page: connect to the adapter, show live readings and a log.
 
-import { ObdSource } from './data/obd.js?v=2';
+import { ObdSource } from './data/obd.js?v=3';
 import { Motion } from './data/motion.js';
 import { Telemetry } from './core/telemetry.js';
 
@@ -28,6 +28,7 @@ function render() {
     stat(f ? Math.round(f.speedKmh / 1.609) : '--', 'MPH'),
     stat(f?.gear ?? '–', 'Gear (estimate)'),
     stat(f ? `${Math.round(f.throttle)}%` : '--', 'Throttle'),
+    stat(f?.throttleRaw != null ? `${f.throttleRaw.toFixed(1)}%` : '--', 'Throttle sensor (raw)'),
     stat(f ? `${Math.round(f.load)}%` : '--', 'Engine load'),
     stat(f ? `${Math.round(f.coolantC)}°` : '--', 'Coolant'),
     stat(f ? `${Math.round(f.intakeC)}°` : '--', 'Intake air'),

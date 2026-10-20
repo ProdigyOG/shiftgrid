@@ -10,6 +10,7 @@ import { Motion } from './data/motion.js';
 import { Telemetry } from './core/telemetry.js';
 import { ShiftGrader } from './core/shifts.js';
 import { ShiftAssist } from './core/shiftassist.js';
+import { Recorder } from './core/recorder.js';
 import { LaunchTimer } from './core/launch.js';
 import { DriveSession } from './core/drive.js';
 import * as progress from './core/progress.js';
@@ -25,6 +26,7 @@ const tel = new Telemetry();
 const grader = new ShiftGrader(tel);
 const launch = new LaunchTimer();
 const assist = new ShiftAssist(tel);
+const recorder = new Recorder();
 let assistState = { ideal: null, flashing: false };
 const hud = new Hud();
 
@@ -98,6 +100,17 @@ const actions = {
     startDrive();
   },
   finish: finishDrive,
+  'save-data': async () => {
+    const result = await recorder.save();
+    const msg = {
+      shared: 'Saved. Now send the file to Claude.',
+      downloaded: 'Downloaded. Now send the file to Claude.',
+      cancelled: 'Not saved. Tap Save drive data to try again.',
+      failed: "Couldn't save the file on this browser. Tell Claude.",
+    }[result];
+    const el = document.getElementById('save-status');
+    if (el) el.textContent = msg;
+  },
   'cycle-mode': () => {
     if (!session) return;
     const allowed = trackAcknowledged ? MODES : MODES.filter((m) => m !== 'track');
@@ -146,6 +159,7 @@ async function startDrive() {
   grader.reset();
   launch.reset();
   assist.reset();
+  recorder.start({ data: settings.source, mode: settings.mode, paddle: settings.paddle });
   liveBadges = [];
   stoppedSince = null;
   latest = null;
@@ -179,6 +193,7 @@ async function startDrive() {
 function onSample(sample) {
   if (!session) return;
   const f = tel.update(sample);
+  recorder.add(f);
   const gamey = session.mode !== 'chill';
   const locked = gamey && f.coolantC < DRIVING.coldCoolantC;
 
@@ -212,7 +227,7 @@ function finishDrive() {
   wakeLock?.release().catch(() => {});
   wakeLock = null;
   const result = progress.finishDrive(summary, trace, badges);
-  screens.renderReport(result);
+  screens.renderReport(result, { hasRecording: recorder.hasData });
 }
 
 // ---- what happens on each event ---------------------------------------------

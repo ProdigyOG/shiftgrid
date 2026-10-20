@@ -10,6 +10,8 @@
 // Makers use different Bluetooth service codes for that link, so we try the
 // common ones. If the CX uses another, the test page shows what it reports.
 
+import { load, save } from '../util/store.js';
+
 const SERIAL_SERVICES = [
   '0000fff0-0000-1000-8000-00805f9b34fb',
   '0000ffe0-0000-1000-8000-00805f9b34fb',
@@ -20,16 +22,23 @@ const SERIAL_SERVICES = [
   '000018f0-0000-1000-8000-00805f9b34fb',
 ];
 
-// Standard OBD-II readings (mode 01). `every` = poll every Nth cycle.
+// Standard OBD-II readings (mode 01). `fast` ones are read every cycle,
+// the rest every Nth cycle.
 export const PIDS = {
-  rpm: { pid: '0C', bytes: 2, every: 1, decode: (a, b) => (a * 256 + b) / 4 },
-  speedKmh: { pid: '0D', bytes: 1, every: 1, decode: (a) => a },
-  throttle: { pid: '11', bytes: 1, every: 1, decode: (a) => (a * 100) / 255 },
-  load: { pid: '04', bytes: 1, every: 3, decode: (a) => (a * 100) / 255 },
-  coolantC: { pid: '05', bytes: 1, every: 15, decode: (a) => a - 40 },
-  intakeC: { pid: '0F', bytes: 1, every: 15, decode: (a) => a - 40 },
-  fuelPct: { pid: '2F', bytes: 1, every: 30, decode: (a) => (a * 100) / 255 },
+  rpm: { pid: '0C', bytes: 2, fast: true, decode: (a, b) => (a * 256 + b) / 4 },
+  speedKmh: { pid: '0D', bytes: 1, fast: true, decode: (a) => a },
+  throttleRaw: { pid: '11', bytes: 1, fast: true, decode: (a) => (a * 100) / 255 },
+  load: { pid: '04', bytes: 1, every: 4, decode: (a) => (a * 100) / 255 },
+  coolantC: { pid: '05', bytes: 1, every: 25, decode: (a) => a - 40 },
+  intakeC: { pid: '0F', bytes: 1, every: 25, decode: (a) => a - 40 },
+  fuelPct: { pid: '2F', bytes: 1, every: 50, decode: (a) => (a * 100) / 255 },
 };
+const BY_PID = Object.fromEntries(Object.entries(PIDS).map(([name, p]) => [p.pid, { name, ...p }]));
+
+// The throttle sensor doesn't read 0% with your foot off (on this car about 13%)
+// or 100% flat out, so we learn the real range and rescale it to 0-100%.
+// Until full throttle has been seen, assume the range is about 70% wide.
+const THROTTLE_SPAN_GUESS = 70;
 
 const INIT = ['ATZ', 'ATE0', 'ATL0', 'ATS0', 'ATH0', 'ATAT2', 'ATSP0'];
 
@@ -38,8 +47,11 @@ export class ObdSource {
     this.log = log;
     this.motion = motion; // optional phone g-force (motion.js)
     this.label = 'CAR';
-    this.values = { rpm: 0, speedKmh: 0, throttle: 0, load: 0, coolantC: 20, intakeC: 20, fuelPct: 0 };
+    this.values = { rpm: 0, speedKmh: 0, throttle: 0, throttleRaw: 0, load: 0, coolantC: 20, intakeC: 20, fuelPct: 0 };
+    this.cal = load('car', { thrMin: null, thrMax: null });
+    this.calSavedAt = 0;
     this.supported = null;
+    this.multi = false;
     this.buffer = '';
     this.pending = null;
     this.running = false;
@@ -92,12 +104,43 @@ export class ObdSource {
       this.log(`${cmd} → ${reply || '(no reply)'}`);
       if (cmd === 'ATZ' && !reply) throw new Error('The adapter did not answer. Unplug it for 10 seconds, plug it back in and try again.');
     }
+
+    // which readings does this car offer? (asked in ranges of 32)
     const sup = await this.send('0100', 6000);
     this.log(`0100 → ${sup}`);
-    this.supported = parseSupported(sup);
+    this.supported = parseSupported(sup, 0x00);
     if (!this.supported) throw new Error('The car did not answer. Is the ignition on?');
+    for (const base of [0x20, 0x40]) {
+      if (!this.supported.has(hex(base))) break;
+      const cmd = `01${hex(base)}`;
+      const more = await this.send(cmd, 3000);
+      this.log(`${cmd} → ${more || '(no reply)'}`);
+      parseSupported(more, base)?.forEach((pid) => this.supported.add(pid));
+    }
     for (const [name, p] of Object.entries(PIDS)) {
       if (!this.supported.has(p.pid)) this.log(`Not available on this car: ${name}`);
+    }
+
+    // Talk to the engine computer only. Otherwise the gearbox computer answers
+    // too, and the adapter waits for both. (Standard 11-bit CAN cars only.)
+    const proto = await this.send('ATDPN');
+    this.log(`Protocol: ${proto}`);
+    if (/[68]$/.test(proto.trim())) {
+      await this.send('ATSH7E0');
+      if ((await this.readOne('rpm')) === null) {
+        await this.send('ATSH7DF');
+        this.log('Engine-only addressing did not work; asking all computers.');
+      } else {
+        this.log('Talking to the engine computer only.');
+      }
+    }
+
+    // Ask for rpm, speed and throttle in one go, if the adapter allows it.
+    const fast = this.fastPids();
+    if (fast.length > 1) {
+      const got = await this.readMany(fast);
+      this.multi = got !== null && fast.every((n) => got[n] !== undefined);
+      this.log(this.multi ? `Reading ${fast.join(', ')} together.` : 'Reading one value at a time.');
     }
     this.log('Ready.');
   }
@@ -133,22 +176,53 @@ export class ObdSource {
     return reply;
   }
 
-  async readPid(name) {
-    const p = PIDS[name];
-    // the trailing "1" tells the adapter to stop after one answer (faster)
-    // (some adapters don't understand that; then we drop it)
-    let reply = (await this.send(`01${p.pid}${this.noCount ? '' : '1'}`)).replace(/ /g, '');
+  fastPids() {
+    return Object.keys(PIDS).filter((n) => PIDS[n].fast && this.supported?.has(PIDS[n].pid));
+  }
+
+  // Send a mode 01 request. The trailing "1" tells the adapter to stop after
+  // the first answer (faster). Some adapters don't understand it; then we drop it.
+  async request(pids) {
+    let reply = await this.send(`01${pids.join('')}${this.noCount ? '' : '1'}`);
     if (!this.noCount && reply.includes('?')) {
       this.noCount = true;
-      reply = (await this.send(`01${p.pid}`)).replace(/ /g, '');
+      reply = await this.send(`01${pids.join('')}`);
     }
-    const at = reply.indexOf(`41${p.pid}`);
-    if (at === -1) return null;
-    const data = reply.slice(at + 4, at + 4 + p.bytes * 2);
-    if (data.length < p.bytes * 2) return null;
-    const a = parseInt(data.slice(0, 2), 16);
-    const b = parseInt(data.slice(2, 4), 16);
-    return p.decode(a, b);
+    return parseMode01(reply);
+  }
+
+  async readOne(name) {
+    const got = await this.request([PIDS[name].pid]);
+    return got?.[name] ?? null;
+  }
+
+  async readMany(names) {
+    return this.request(names.map((n) => PIDS[n].pid));
+  }
+
+  setValues(got) {
+    if (!got) return;
+    for (const [k, v] of Object.entries(got)) if (v !== null && v !== undefined) this.values[k] = v;
+    if (got.throttleRaw != null) this.values.throttle = this.scaleThrottle(got.throttleRaw);
+  }
+
+  scaleThrottle(raw) {
+    const c = this.cal;
+    let changed = false;
+    if (c.thrMin === null || raw < c.thrMin) {
+      c.thrMin = raw;
+      changed = true;
+    }
+    if (c.thrMax === null || raw > c.thrMax) {
+      c.thrMax = raw;
+      changed = true;
+    }
+    if (changed && performance.now() - this.calSavedAt > 5000) {
+      this.calSavedAt = performance.now();
+      save('car', c);
+    }
+    const span = Math.max(c.thrMax - c.thrMin, THROTTLE_SPAN_GUESS);
+    return Math.min(100, Math.max(0, ((raw - c.thrMin) / span) * 100));
   }
 
   start(onSample) {
@@ -158,6 +232,7 @@ export class ObdSource {
 
   stop() {
     this.running = false;
+    save('car', this.cal);
   }
 
   disconnect() {
@@ -177,12 +252,20 @@ export class ObdSource {
     let count = 0;
     let rateStart = performance.now();
     while (this.running) {
+      const fast = this.fastPids();
+      if (this.multi) {
+        this.setValues(await this.readMany(fast));
+      } else {
+        for (const name of fast) {
+          if (!this.running) return;
+          this.setValues({ [name]: await this.readOne(name) });
+        }
+      }
       for (const [name, p] of Object.entries(PIDS)) {
         if (!this.running) return;
+        if (p.fast || cycle % p.every !== 0) continue;
         if (this.supported && !this.supported.has(p.pid)) continue;
-        if (cycle % p.every !== 0) continue;
-        const value = await this.readPid(name);
-        if (value !== null) this.values[name] = value;
+        this.setValues({ [name]: await this.readOne(name) });
       }
       cycle++;
 
@@ -229,18 +312,43 @@ function props(c) {
   return [p.read && 'r', p.write && 'w', p.writeWithoutResponse && 'wn', p.notify && 'n', p.indicate && 'i'].filter(Boolean).join('');
 }
 
-// "4100BE3EB811" -> set of supported PIDs 01-20
-function parseSupported(reply) {
+const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
+
+// "4100BE3EB811" -> set of supported PIDs (base+1 .. base+32)
+function parseSupported(reply, base) {
   const clean = reply.replace(/ /g, '');
-  const at = clean.indexOf('4100');
+  const at = clean.indexOf(`41${hex(base)}`);
   if (at === -1) return null;
   const bits = parseInt(clean.slice(at + 4, at + 12), 16);
   if (Number.isNaN(bits)) return null;
   const set = new Set();
   for (let i = 0; i < 32; i++) {
-    if (bits & (1 << (31 - i))) set.add((i + 1).toString(16).toUpperCase().padStart(2, '0'));
+    if (bits & (1 << (31 - i))) set.add(hex(base + i + 1));
   }
-  // PIDs above 0x20 (like fuel level 2F) need the next range; assume yes and let reads fail quietly
-  set.add('2F');
   return set;
+}
+
+// Turn a mode 01 reply into { rpm: 1726, speedKmh: 60, ... }.
+// Handles single answers ("410C1AF8") and the multi-line form the adapter
+// uses for longer answers ("00A 0:410C1AF80D3C 1:1166...").
+export function parseMode01(reply) {
+  const data = reply
+    .toUpperCase()
+    .split(' ')
+    .filter((tok) => !/^[0-9A-F]{3}$/.test(tok) && !tok.includes('SEARCHING'))
+    .map((tok) => tok.replace(/^[0-9A-F]:/, ''))
+    .join('');
+  let i = data.indexOf('41');
+  if (i === -1) return null;
+  i += 2;
+  const out = {};
+  while (i + 2 <= data.length) {
+    const p = BY_PID[data.slice(i, i + 2)];
+    if (!p || i + 2 + p.bytes * 2 > data.length) break;
+    const a = parseInt(data.slice(i + 2, i + 4), 16);
+    const b = parseInt(data.slice(i + 4, i + 6), 16);
+    out[p.name] = p.decode(a, b);
+    i += 2 + p.bytes * 2;
+  }
+  return Object.keys(out).length ? out : null;
 }
