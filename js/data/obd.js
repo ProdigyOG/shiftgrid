@@ -64,16 +64,22 @@ export class ObdSource {
     });
     const server = await this.device.gatt.connect();
     const services = await server.getPrimaryServices();
-    this.log(`Services: ${services.map((s) => s.uuid).join(', ') || 'none'}`);
+    this.log(`Services: ${services.map((s) => short(s.uuid)).join(', ') || 'none'}`);
 
-    for (const service of services) {
+    // Only ever use a known serial (data) channel, in our preferred order.
+    // Adapters also offer other channels, e.g. FEF5 on the CX is for firmware
+    // updates. Never send commands to those.
+    for (const wanted of SERIAL_SERVICES) {
+      const service = services.find((s) => full(s.uuid) === wanted);
+      if (!service) continue;
       const chars = await service.getCharacteristics();
+      this.log(`  using ${short(service.uuid)}: ${chars.map((c) => `${short(c.uuid)}[${props(c)}]`).join(' ')}`);
       const notify = chars.find((c) => c.properties.notify || c.properties.indicate);
       const write = chars.find((c) => c.properties.write || c.properties.writeWithoutResponse);
-      this.log(`  ${service.uuid}: ${chars.map((c) => `${c.uuid.slice(4, 8)}[${props(c)}]`).join(' ')}`);
-      if (notify && write && !this.rx) {
+      if (notify && write) {
         this.rx = notify;
         this.tx = write;
+        break;
       }
     }
     if (!this.rx) throw new Error('Connected, but found no serial link. Send Claude a screenshot of this log.');
@@ -84,6 +90,7 @@ export class ObdSource {
     for (const cmd of INIT) {
       const reply = await this.send(cmd, cmd === 'ATZ' ? 3000 : 2000);
       this.log(`${cmd} → ${reply || '(no reply)'}`);
+      if (cmd === 'ATZ' && !reply) throw new Error('The adapter did not answer. Unplug it for 10 seconds, plug it back in and try again.');
     }
     const sup = await this.send('0100', 6000);
     this.log(`0100 → ${sup}`);
@@ -204,6 +211,17 @@ export class ObdSource {
       }
     }
   }
+}
+
+// Some browsers (Bluefy) report short codes like "FFF0"; make them all full and lowercase.
+function full(uuid) {
+  const u = String(uuid).toLowerCase();
+  return /^[0-9a-f]{4}$/.test(u) ? `0000${u}-0000-1000-8000-00805f9b34fb` : u;
+}
+
+function short(uuid) {
+  const u = full(uuid);
+  return u.endsWith('-0000-1000-8000-00805f9b34fb') ? u.slice(4, 8).toUpperCase() : u;
 }
 
 function props(c) {

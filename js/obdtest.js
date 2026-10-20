@@ -1,6 +1,6 @@
 // Connection test page: connect to the adapter, show live readings and a log.
 
-import { ObdSource } from './data/obd.js';
+import { ObdSource } from './data/obd.js?v=2';
 import { Motion } from './data/motion.js';
 import { Telemetry } from './core/telemetry.js';
 
