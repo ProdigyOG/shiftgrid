@@ -278,6 +278,8 @@ export class ObdSource {
       }
       lastSpeed = this.values.speedKmh;
       lastT = t;
+      // the phone learns which way is "forward" from these speed changes
+      if (this.values.speedKmh > 10) this.motion?.learn(gFromSpeed);
       const m = this.motion?.read();
       onSample({
         t,

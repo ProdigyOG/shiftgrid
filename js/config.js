@@ -5,22 +5,20 @@
 export const APP_NAME = 'SHIFTGRID';
 
 export const CAR = {
-  idleRpm: 750,
+  idleRpm: 626, // measured warm idle
   redlineRpm: 6750, // where the red zone starts on the tach (from a photo); true limiter TBC from drive data
-  // 8-speed ratios used by this family of ZF gearbox. PLACEHOLDER until calibrated.
+  // 8-speed ratios used by this family of ZF gearbox (only used by the simulator's physics)
   gearRatios: [4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667],
-  finalDrive: 3.31, // PLACEHOLDER
-  tyreCircumferenceM: 2.2, // 275/35 R20 rear, approx.
 };
 
-// Engine rpm per km/h in each gear, derived from the numbers above.
-export const RPM_PER_KMH = CAR.gearRatios.map(
-  (r) => (1000 / 3600 / CAR.tyreCircumferenceM) * 60 * r * CAR.finalDrive
-);
+// Engine rpm per km/h in each gear, MEASURED from the 2026-10-20 drive
+// (median of ~2,800 moving readings). 1st had too few readings, so it's
+// estimated from the gearbox ratio with the same ~7% correction as 2nd.
+export const RPM_PER_KMH = [126.6, 84.4, 56.7, 44.6, 34.2, 26.6, 22.2, 17.65];
 
 export const GEAR_DETECT = {
   minSpeedKmh: 8, // below this the torque converter slips, so gear can't be calculated
-  tolerance: 0.1, // how close rpm/speed must be to a gear's ratio (10%)
+  tolerance: 0.08, // how close rpm/speed must be to a gear's ratio (8%; real readings sit within ~2%)
   stableSamples: 2, // readings in a row before we believe a gear change
 };
 

@@ -1,7 +1,7 @@
 // Connection test page: connect to the adapter, show live readings and a log.
 
-import { ObdSource } from './data/obd.js?v=3';
-import { Motion } from './data/motion.js';
+import { ObdSource } from './data/obd.js?v=4';
+import { Motion } from './data/motion.js?v=4';
 import { Telemetry } from './core/telemetry.js';
 
 const $ = (id) => document.getElementById(id);
@@ -36,6 +36,7 @@ function render() {
     stat(source?.rateHz ? source.rateHz.toFixed(1) : '--', 'Updates / sec'),
     stat(m ? m.gLong.toFixed(2) : '--', 'G fwd/back'),
     stat(m ? m.gLat.toFixed(2) : '--', 'G left/right'),
+    stat(!motionOn ? '--' : motion.learned ? 'Learned' : 'Learning', 'Phone direction'),
   ].join('');
   requestAnimationFrame(render);
 }
@@ -66,7 +67,11 @@ $('motion').addEventListener('click', async () => {
     motion.calibrate();
     motionOn = true;
     if (source) source.motion = motion;
-    status('Motion sensor on. Keep the phone still: both G numbers should sit near 0.00.');
+    status(
+      motion.learned
+        ? 'Motion sensor on, direction remembered from last time. Keep still: both G numbers should sit near 0.00.'
+        : 'Motion sensor on. It learns which way is forward once you drive a little (speed up and slow down a few times).'
+    );
     log('Motion sensor calibrated.');
   } catch (err) {
     status(err.message || String(err));
