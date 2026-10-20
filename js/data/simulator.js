@@ -9,6 +9,7 @@
 // t is milliseconds. gLong is + when accelerating, - when braking. gLat is + to the right.
 
 import { CAR, RPM_PER_KMH } from '../config.js';
+import { idealShiftRpm } from '../core/shifts.js';
 
 const G = 9.81;
 const STEP_S = 0.05; // one sample every 50 ms of simulated time
@@ -117,9 +118,9 @@ export class Simulator {
     return gauss() * 280;
   }
 
+  // the pretend driver aims for the same shift points the grader uses
   idealShiftRpm() {
-    const k = clamp((this.thr - 20) / 70, 0, 1);
-    return 2400 + k * (6200 - 2400);
+    return idealShiftRpm(this.thr);
   }
 
   gearbox(rpm) {

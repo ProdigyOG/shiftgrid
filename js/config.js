@@ -6,7 +6,7 @@ export const APP_NAME = 'SHIFTGRID';
 
 export const CAR = {
   idleRpm: 750,
-  redlineRpm: 6500, // PLACEHOLDER: confirm on the tachometer
+  redlineRpm: 6750, // where the red zone starts on the tach (from a photo); true limiter TBC from drive data
   // 8-speed ratios used by this family of ZF gearbox. PLACEHOLDER until calibrated.
   gearRatios: [4.714, 3.143, 2.106, 1.667, 1.285, 1.0, 0.839, 0.667],
   finalDrive: 3.31, // PLACEHOLDER
@@ -27,7 +27,7 @@ export const GEAR_DETECT = {
 export const GRADING = {
   upshift: {
     idealLightThrottle: 2400, // ideal shift rpm when cruising gently
-    idealFullThrottle: 6200, // ideal shift rpm at full throttle
+    idealFullThrottle: 6400, // ideal shift rpm at full throttle (just under the red zone)
     perfectWindow: 250, // +/- rpm for PERFECT
     goodWindow: 600, // +/- rpm for GOOD
     minThrottle: 12, // shifts below this throttle % (coasting) aren't graded
